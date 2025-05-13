@@ -40,14 +40,16 @@ up_get_dims <- function(df, n, type = "horizontal") {
 #' 
 #' @export
 up_regular_lines <- function(df, dims, mask = TRUE) {
-  message("Generating regularly spaced lines over input bbox...")
+  
   bbox <- df |>
     sf::st_bbox()
+  
   line_positions <- seq(
       from = dims$int_min, 
       to = dims$int_max, 
       by = dims$interval
     )
+  
   lines <- sf::st_sfc(crs = sf::st_crs(df))
   for (line in line_positions) {
     if (dims$type == "vertical") {
@@ -77,7 +79,7 @@ up_regular_lines <- function(df, dims, mask = TRUE) {
   if (mask) {
     sf |>
       sf::st_intersection(
-        sf::st_geometry(df)
+        sf::st_geometry(df |> sf::st_union())
       ) |>
       dplyr::rowwise() |>
       dplyr::filter(sf::st_geometry_type(.data$geometry) != "POINT") |>
@@ -126,7 +128,7 @@ up_unknown_pleasures <- function(
     sf::st_cast("POINT", warn = FALSE)
     
   message("Extracting elevations at sample points...")
-  elevated_lines$elev <- raster::extract(raster, elevated_lines)
+  elevated_lines$elev <- terra::extract(raster, elevated_lines)
   elevated_lines
   if (is.null(max)) {
     max <- max(abs(elevated_lines$elev), na.rm = TRUE)
