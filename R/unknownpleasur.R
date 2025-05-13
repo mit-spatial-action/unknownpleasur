@@ -80,7 +80,7 @@ up_regular_lines <- function(df, dims, mask = TRUE) {
         sf::st_geometry(df)
       ) |>
       dplyr::rowwise() |>
-      dplyr::filter(st_geometry_type(geometry) != "POINT") |>
+      dplyr::filter(sf::st_geometry_type(.data$geometry) != "POINT") |>
       dplyr::ungroup() |> 
       sf::st_cast("MULTILINESTRING") |>
       sf::st_cast("LINESTRING", warn = FALSE) |>
@@ -95,7 +95,7 @@ up_regular_lines <- function(df, dims, mask = TRUE) {
 #' Transforms regularly-spaced lines into an "Unknown Pleasures"-esque set of regular section cuts based on raster value.
 #'
 #' @param lines `sf` object containing regularly spaced lines.
-#' @param `raster` object.
+#' @param raster `raster` object.
 #' @param dims An object returned by the `up_get_dims()` function.
 #' @param max Numeric.
 #' @param sample_size Interval, in meters, to sample along lines.
@@ -118,7 +118,7 @@ up_unknown_pleasures <- function(
   elevated_lines <- lines |>
     dplyr::mutate(
       geometry = sf::st_line_sample(
-        geometry, 
+        .data$geometry, 
         density = (1 / units::as_units(sample_size, "m")),
         type = "regular"
       )
@@ -133,14 +133,14 @@ up_unknown_pleasures <- function(
   }
   scale <- dims$interval / max
   elevated_lines <- elevated_lines |>
-    tidyr::drop_na(elev) |>
-    dplyr::group_by(id) |>
-    dplyr::filter(n() > 1) |>
+    tidyr::drop_na(.data$elev) |>
+    dplyr::group_by(.data$id) |>
+    dplyr::filter(dplyr::n() > 1) |>
     dplyr::ungroup() |>
     dplyr::mutate(
-      elev_scaled = (elev + (0.01 * elev)) * (scale * bleed_factor)
+      elev_scaled = (.data$elev + (0.01 * .data$elev)) * (scale * bleed_factor)
     ) |>
-    tidyr::drop_na(elev_scaled)
+    tidyr::drop_na(.data$elev_scaled)
   if (mode == "planar") {
     message("Performing Affine Transform on points...")
     elevated_lines <- elevated_lines |>
@@ -148,33 +148,33 @@ up_unknown_pleasures <- function(
       dplyr::mutate(
         geometry = ifelse(
           (dims$type == "horizontal"),
-          geometry + c(0, elev_scaled),
-          geometry + c(elev_scaled, 0)
+          .data$geometry + c(0, .data$elev_scaled),
+          .data$geometry + c(.data$elev_scaled, 0)
           ),
         coords = ifelse(
           (dims$type == "horizontal"),
-          sf::st_coordinates(geometry)[,1],
-          sf::st_coordinates(geometry)[,2]
+          sf::st_coordinates(.data$geometry)[,1],
+          sf::st_coordinates(.data$geometry)[,2]
         )
       ) |>
       dplyr::ungroup() |>
       sf::st_set_crs(sf::st_crs(lines)) |>
-      dplyr::group_by(id)
+      dplyr::group_by(.data$id)
       if (dims$type == "vertical") {
         elevated_lines <- elevated_lines |>
-          dplyr::arrange(coords, .by_group = TRUE) |>
+          dplyr::arrange(.data$coords, .by_group = TRUE) |>
           dplyr::ungroup()
       } else if (dims$type == "horizontal") {
         elevated_lines <- elevated_lines |>
-          dplyr::arrange(dplyr::desc(coords), .by_group = TRUE) |>
+          dplyr::arrange(dplyr::desc(.data$coords), .by_group = TRUE) |>
           dplyr::ungroup()
       }
   } else if (mode == "xyz") {
     message("Attaching Z values to component points...")
     elevated_lines <- elevated_lines |>
       dplyr::mutate(
-        x = sf::st_coordinates(.)[,1],
-        y = sf::st_coordinates(.)[,2]
+        x = sf::st_coordinates(.data$geometry)[,1],
+        y = sf::st_coordinates(.data$geometry)[,2]
       ) |>
       sf::st_drop_geometry() |>
       sf::st_as_sf(
@@ -184,7 +184,7 @@ up_unknown_pleasures <- function(
       )
   }
   elevated_lines <- elevated_lines |>
-    dplyr::group_by(id) |>
+    dplyr::group_by(.data$id) |>
     dplyr::summarize(do_union = FALSE) |>
     sf::st_cast("LINESTRING")
   
@@ -192,7 +192,7 @@ up_unknown_pleasures <- function(
     message("Building closed loops...")
     lines <- lines |>
       dplyr::filter(
-        id %in% dplyr::pull(elevated_lines, id)
+        .data$id %in% dplyr::pull(elevated_lines, .data$id)
       )
     if (mode == "xyz") {
       lines <- lines |>
@@ -205,58 +205,58 @@ up_unknown_pleasures <- function(
     elevated_lines <- elevated_lines |>
       dplyr::bind_rows(lines) |>
       sf::st_cast("POINT", warn = FALSE) |>
-      dplyr::group_by(id) |>
+      dplyr::group_by(.data$id) |>
       dplyr::summarize(do_union = FALSE) |>
       sf::st_cast("POLYGON") |>
       dplyr::ungroup() |>
-      dplyr::arrange(desc(id))
+      dplyr::arrange(dplyr::desc(.data$id))
     if (mode == "xyz") {
       warning("Can't build polygons in XYZ mode---returning POLYLINES instead.")
       elevated_lines <- elevated_lines |>
         sf::st_cast("POINT", warn = FALSE) |>
         dplyr::mutate(
-          z = sf::st_coordinates(.)[,3]
+          z = sf::st_coordinates(.data$geometry)[,3]
         ) |>
         sf::st_zm(drop = TRUE) |>
         dplyr::rowwise() |>
         dplyr::mutate(
           geometry = ifelse(
             (dims$type == "horizontal"),
-            geometry + c(0, z),
-            geometry + c(z, 0)
+            .data$geometry + c(0, .data$z),
+            .data$geometry + c(.data$z, 0)
           )
         ) |>
         dplyr::ungroup() |>
-        dplyr::group_by(id) |>
+        dplyr::group_by(.data$id) |>
         dplyr::summarize(do_union = FALSE) |>
         sf::st_cast("POLYGON") |>
         dplyr::ungroup() |>
         sf::st_buffer(0.0) |>
         sf::st_cast("MULTIPOLYGON") |>
         sf::st_cast("POLYGON", warn = FALSE) |>
-        st_buffer(0.0) |>
+        sf::st_buffer(0.0) |>
         sf::st_make_valid() |>
         dplyr::mutate(
           id = dplyr::row_number()
         ) |>
         sf::st_cast("POINT", warn = FALSE) |>
         dplyr::mutate(
-          x = sf::st_coordinates(.)[,1],
-          y = sf::st_coordinates(.)[,2]
+          x = sf::st_coordinates(.data$geometry)[,1],
+          y = sf::st_coordinates(.data$geometry)[,2]
         ) |>
         sf::st_drop_geometry() |>
-        dplyr::group_by(id) 
+        dplyr::group_by(.data$id) 
       if (dims$type == "horizontal") {
         elevated_lines <- elevated_lines |>
           dplyr::mutate(
-            z = y - min(y),
-            y = y - z
+            z = .data$y - min(.data$y),
+            y = .data$y - .data$z
           )
       } else {
         elevated_lines <- elevated_lines |>
           dplyr::mutate(
-            z = x - min(x),
-            x = x - z
+            z = .data$x - min(.data$x),
+            x = .data$x - .data$z
           )
       }
       elevated_lines |>
@@ -265,8 +265,8 @@ up_unknown_pleasures <- function(
           dim = "XYZ",
           crs = sf::st_crs(lines)
         ) |>
-        dplyr::group_by(id) |>
-        dplyr::filter(n() >= 4) |>
+        dplyr::group_by(.data$id) |>
+        dplyr::filter(dplyr::n() >= 4) |>
         dplyr::summarize(do_union = FALSE) |>
         sf::st_cast("POLYGON") |>
         sf::st_cast("LINESTRING", warn = FALSE)

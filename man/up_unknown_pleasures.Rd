@@ -18,6 +18,8 @@ up_unknown_pleasures(
 \arguments{
 \item{lines}{\code{sf} object containing regularly spaced lines.}
 
+\item{raster}{\code{raster} object.}
+
 \item{dims}{An object returned by the \code{up_get_dims()} function.}
 
 \item{max}{Numeric.}
@@ -29,8 +31,6 @@ up_unknown_pleasures(
 \item{mode}{If \code{planar}, results will be planar offset lines. If \code{xyz}, lines will be offset on \code{LINESTRING} z axis.}
 
 \item{polygon}{If \code{TRUE}, outputs polygons (or closed linestrings if paired with \code{mode = "xyz"}. If \code{FALSE}, outputs lines with no baseline.}
-
-\item{`raster`}{object.}
 }
 \value{
 \code{sf} object  containing "Unknown Pleasures" features.
