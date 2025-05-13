@@ -1,0 +1,13 @@
+Package: unknownpleasur
+Title: Create pulsar or section cut layers from raster
+Version: 0.1-beta.0
+Authors@R: 
+    person("Eric", "Robsky Huntley", "eric@ographiesresearch.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-8497-0589"))
+Description: Create pulsar-style visualizations of arbitrary raster data.
+License: GPL-2.0 + file LICENSE
+URL: https://github.com/mit-spatial-action/unknownpleasur
+BugReports: https://github.com/mit-spatial-action/unknownpleasur/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
