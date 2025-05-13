@@ -1,0 +1,13 @@
+^renv$
+^renv\.lock$
+^.*\.Rproj$
+^\.Rproj\.user$
+^data-raw$
+^LICENSE.md$
+^config.yml$
+^.env$
+^sandbox.R$
+^\.github$
+^LICENSE\.md$
+^\.github$
+^media$

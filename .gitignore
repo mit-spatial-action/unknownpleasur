@@ -39,3 +39,4 @@ vignettes/*.pdf
 .Renviron
 
 renv/*
+inst/doc
