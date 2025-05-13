@@ -1,10 +1,12 @@
-get_dims <- function(sdf, n, type = "horizontal") {
-  #' Generate list of dimension-related quantities.
-  #'
-  #' @param bbox Object of type `bbox`.
-  #' @param n Number of regularly-spaced lines to generate.
-  #' @param type String indicating direction of lines---options are "horizontal" and "vertical".
-  #' @returns A list of interval-relevant values.
+#' Generate list of dimension-related quantities.
+#'
+#' @param df `sf` object.
+#' @param n Number of regularly-spaced lines to generate.
+#' @param type String indicating direction of lines---options are "horizontal" and "vertical".
+#' @returns A list of interval-relevant values.
+#' 
+#' @export
+up_get_dims <- function(df, n, type = "horizontal") {
   if (type == "horizontal") {
     axes <- list("int_dim" = "y", "edge_dim" = "x")
   } else if (type == "vertical") {
@@ -12,7 +14,7 @@ get_dims <- function(sdf, n, type = "horizontal") {
   } else {
     stop("Invalid line type - expects horizontal or vertical.")
   }
-  bbox <- sf::st_bbox(sdf)
+  bbox <- sf::st_bbox(df)
   int_min <- unname(bbox[paste0(axes$int_dim, "min")])
   int_max <- unname(bbox[paste0(axes$int_dim, "max")])
   edge_min <- unname(bbox[paste0(axes$edge_dim, "min")])
@@ -29,14 +31,15 @@ get_dims <- function(sdf, n, type = "horizontal") {
     )
 }
 
-st_regular_lines <- function(df, dims, mask = TRUE) {
-  #' Generate n regularly-spaced lines over `df` extent.
-  #'
-  #' @param df An `sf` dataframe.
-  #' @param dims Object returned by `get_dims()`.
-  #' @param mask Whether resulting lines should be clipped to df extent.
-  #' @returns A sf dataframe of regularly spaced POLYLINEs.
-  #' @export
+#' Generate `n` regularly-spaced lines over `df` extent.
+#'
+#' @param df An `sf` dataframe.
+#' @param dims Object returned by `up_get_dims()`.
+#' @param mask Whether resulting lines should be clipped to df extent.
+#' @returns A sf dataframe of regularly spaced POLYLINEs.
+#' 
+#' @export
+up_regular_lines <- function(df, dims, mask = TRUE) {
   message("Generating regularly spaced lines over input bbox...")
   bbox <- df %>%
     sf::st_bbox()
@@ -72,7 +75,6 @@ st_regular_lines <- function(df, dims, mask = TRUE) {
   }
   sf <- sf::st_as_sf(data.frame(id = 1:dims$n, geometry = lines)) 
   if (mask) {
-    message("Clipping lines to input layer extent...")
     sf %>%
       sf::st_intersection(
         sf::st_geometry(df)
@@ -90,7 +92,18 @@ st_regular_lines <- function(df, dims, mask = TRUE) {
   }
 }
 
-st_unknown_pleasures <- function(
+#' Transforms regularly-spaced lines into an "Unknown Pleasures"-esque set of regular section cuts based on raster value.
+#'
+#' @param lines `sf` object containing regularly spaced lines.
+#' @param dims An object returned by the `up_get_dims()` function.
+#' @param sample_size Interval, in meters, to sample along lines.
+#' @param bleed_factor How much should maxima bleed into the area of the line above or below.
+#' @param mode If `planar`, results will be planar offset lines. If `xyz`, lines will be offset on `LINESTRING` z axis.
+#' @param polygon If `TRUE`, outputs polygons (or closed linestrings if paired with `mode = "xyz"`. If `FALSE`, outputs lines with no baseline.
+#' @returns `sf` object  containing "Unknown Pleasures" features.
+#' 
+#' @export
+up_unknown_pleasures <- function(
     lines, 
     raster, 
     dims,
@@ -99,17 +112,6 @@ st_unknown_pleasures <- function(
     bleed_factor = 1.5,
     mode = "planar",
     polygon = TRUE) {
-  #' Transforms regularly-spaced lines into an "Unknown Pleasures"-esque set of regular section cuts based on raster value.
-  #'
-  #' @param lines A spatial dataframe containing regularly spaced lines.
-  #' @param dims An object returned by the `get_dims()` function.
-  #' @param sample_size Interval, in meters, to sample along lines.
-  #' @param bleed_factor How much should maxima bleed into the area of the line above or below.
-  #' @param mode If `planar`, results will be planar offset lines. If `xyz`, lines will be offset on `LINESTRING` z axis.
-  #' @param polygon If `TRUE`, outputs polygons (or closed linestrings if paired with `mode = "xyz"`. If `FALSE`, outputs lines with no baseline.
-  #' @returns A spatial dataframe containing "Unknown Pleasures" features.
-  #' @export
-  message("Sampling along lines...")
   elevated_lines <- lines %>%
     dplyr::mutate(
       geometry = sf::st_line_sample(
