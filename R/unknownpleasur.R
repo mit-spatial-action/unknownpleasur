@@ -41,7 +41,7 @@ up_get_dims <- function(df, n, type = "horizontal") {
 #' @export
 up_regular_lines <- function(df, dims, mask = TRUE) {
   message("Generating regularly spaced lines over input bbox...")
-  bbox <- df %>%
+  bbox <- df |>
     sf::st_bbox()
   line_positions <- seq(
       from = dims$int_min, 
@@ -75,15 +75,15 @@ up_regular_lines <- function(df, dims, mask = TRUE) {
   }
   sf <- sf::st_as_sf(data.frame(id = 1:dims$n, geometry = lines)) 
   if (mask) {
-    sf %>%
+    sf |>
       sf::st_intersection(
         sf::st_geometry(df)
-      ) %>%
-      dplyr::rowwise() %>%
-      dplyr::filter(st_geometry_type(geometry) != "POINT") %>%
-      dplyr::ungroup() %>% 
-      sf::st_cast("MULTILINESTRING") %>%
-      sf::st_cast("LINESTRING", warn = FALSE) %>%
+      ) |>
+      dplyr::rowwise() |>
+      dplyr::filter(st_geometry_type(geometry) != "POINT") |>
+      dplyr::ungroup() |> 
+      sf::st_cast("MULTILINESTRING") |>
+      sf::st_cast("LINESTRING", warn = FALSE) |>
       dplyr::mutate(
         id = dplyr::row_number()
       )
@@ -95,11 +95,14 @@ up_regular_lines <- function(df, dims, mask = TRUE) {
 #' Transforms regularly-spaced lines into an "Unknown Pleasures"-esque set of regular section cuts based on raster value.
 #'
 #' @param lines `sf` object containing regularly spaced lines.
+#' @param `raster` object.
 #' @param dims An object returned by the `up_get_dims()` function.
+#' @param max Numeric.
 #' @param sample_size Interval, in meters, to sample along lines.
 #' @param bleed_factor How much should maxima bleed into the area of the line above or below.
 #' @param mode If `planar`, results will be planar offset lines. If `xyz`, lines will be offset on `LINESTRING` z axis.
 #' @param polygon If `TRUE`, outputs polygons (or closed linestrings if paired with `mode = "xyz"`. If `FALSE`, outputs lines with no baseline.
+#' 
 #' @returns `sf` object  containing "Unknown Pleasures" features.
 #' 
 #' @export
@@ -107,41 +110,41 @@ up_unknown_pleasures <- function(
     lines, 
     raster, 
     dims,
-    max = FALSE,
+    max = NULL,
     sample_size = 250,
     bleed_factor = 1.5,
     mode = "planar",
     polygon = TRUE) {
-  elevated_lines <- lines %>%
+  elevated_lines <- lines |>
     dplyr::mutate(
       geometry = sf::st_line_sample(
         geometry, 
         density = (1 / units::as_units(sample_size, "m")),
         type = "regular"
       )
-    ) %>%
+    ) |>
     sf::st_cast("POINT", warn = FALSE)
     
   message("Extracting elevations at sample points...")
   elevated_lines$elev <- raster::extract(raster, elevated_lines)
   elevated_lines
-  if (!max) {
+  if (is.null(max)) {
     max <- max(abs(elevated_lines$elev), na.rm = TRUE)
   }
   scale <- dims$interval / max
-  elevated_lines <- elevated_lines %>%
-    tidyr::drop_na(elev) %>%
-    dplyr::group_by(id) %>%
-    dplyr::filter(n() > 1) %>%
-    dplyr::ungroup() %>%
+  elevated_lines <- elevated_lines |>
+    tidyr::drop_na(elev) |>
+    dplyr::group_by(id) |>
+    dplyr::filter(n() > 1) |>
+    dplyr::ungroup() |>
     dplyr::mutate(
       elev_scaled = (elev + (0.01 * elev)) * (scale * bleed_factor)
-    ) %>%
+    ) |>
     tidyr::drop_na(elev_scaled)
   if (mode == "planar") {
     message("Performing Affine Transform on points...")
-    elevated_lines <- elevated_lines %>%
-      dplyr::rowwise() %>%
+    elevated_lines <- elevated_lines |>
+      dplyr::rowwise() |>
       dplyr::mutate(
         geometry = ifelse(
           (dims$type == "horizontal"),
@@ -153,123 +156,123 @@ up_unknown_pleasures <- function(
           sf::st_coordinates(geometry)[,1],
           sf::st_coordinates(geometry)[,2]
         )
-      ) %>%
-      dplyr::ungroup() %>%
-      sf::st_set_crs(sf::st_crs(lines)) %>%
+      ) |>
+      dplyr::ungroup() |>
+      sf::st_set_crs(sf::st_crs(lines)) |>
       dplyr::group_by(id)
       if (dims$type == "vertical") {
-        elevated_lines <- elevated_lines %>%
-          dplyr::arrange(coords, .by_group = TRUE) %>%
+        elevated_lines <- elevated_lines |>
+          dplyr::arrange(coords, .by_group = TRUE) |>
           dplyr::ungroup()
       } else if (dims$type == "horizontal") {
-        elevated_lines <- elevated_lines %>%
-          dplyr::arrange(dplyr::desc(coords), .by_group = TRUE) %>%
+        elevated_lines <- elevated_lines |>
+          dplyr::arrange(dplyr::desc(coords), .by_group = TRUE) |>
           dplyr::ungroup()
       }
   } else if (mode == "xyz") {
     message("Attaching Z values to component points...")
-    elevated_lines <- elevated_lines %>%
+    elevated_lines <- elevated_lines |>
       dplyr::mutate(
         x = sf::st_coordinates(.)[,1],
         y = sf::st_coordinates(.)[,2]
-      ) %>%
-      sf::st_drop_geometry() %>%
+      ) |>
+      sf::st_drop_geometry() |>
       sf::st_as_sf(
         coords = c("x", "y", "elev_scaled"),
         dim = "XYZ",
         crs = sf::st_crs(lines)
       )
   }
-  elevated_lines <- elevated_lines %>%
-    dplyr::group_by(id) %>%
-    dplyr::summarize(do_union = FALSE) %>%
+  elevated_lines <- elevated_lines |>
+    dplyr::group_by(id) |>
+    dplyr::summarize(do_union = FALSE) |>
     sf::st_cast("LINESTRING")
   
   if (polygon) {
     message("Building closed loops...")
-    lines <- lines %>%
+    lines <- lines |>
       dplyr::filter(
         id %in% dplyr::pull(elevated_lines, id)
       )
     if (mode == "xyz") {
-      lines <- lines %>%
+      lines <- lines |>
         sf::st_zm(
           drop = FALSE, 
           what = "Z"
-        ) %>%
+        ) |>
         sf::st_reverse()
     }
-    elevated_lines <- elevated_lines %>%
-      dplyr::bind_rows(lines) %>%
-      sf::st_cast("POINT", warn = FALSE) %>%
-      dplyr::group_by(id) %>%
-      dplyr::summarize(do_union = FALSE) %>%
-      sf::st_cast("POLYGON") %>%
-      dplyr::ungroup() %>%
+    elevated_lines <- elevated_lines |>
+      dplyr::bind_rows(lines) |>
+      sf::st_cast("POINT", warn = FALSE) |>
+      dplyr::group_by(id) |>
+      dplyr::summarize(do_union = FALSE) |>
+      sf::st_cast("POLYGON") |>
+      dplyr::ungroup() |>
       dplyr::arrange(desc(id))
     if (mode == "xyz") {
       warning("Can't build polygons in XYZ mode---returning POLYLINES instead.")
-      elevated_lines <- elevated_lines %>%
-        sf::st_cast("POINT", warn = FALSE) %>%
+      elevated_lines <- elevated_lines |>
+        sf::st_cast("POINT", warn = FALSE) |>
         dplyr::mutate(
           z = sf::st_coordinates(.)[,3]
-        ) %>%
-        sf::st_zm(drop = TRUE) %>%
-        dplyr::rowwise() %>%
+        ) |>
+        sf::st_zm(drop = TRUE) |>
+        dplyr::rowwise() |>
         dplyr::mutate(
           geometry = ifelse(
             (dims$type == "horizontal"),
             geometry + c(0, z),
             geometry + c(z, 0)
           )
-        ) %>%
-        dplyr::ungroup() %>%
-        dplyr::group_by(id) %>%
-        dplyr::summarize(do_union = FALSE) %>%
-        sf::st_cast("POLYGON") %>%
-        dplyr::ungroup() %>%
-        sf::st_buffer(0.0) %>%
-        sf::st_cast("MULTIPOLYGON") %>%
-        sf::st_cast("POLYGON", warn = FALSE) %>%
-        st_buffer(0.0) %>%
-        sf::st_make_valid() %>%
+        ) |>
+        dplyr::ungroup() |>
+        dplyr::group_by(id) |>
+        dplyr::summarize(do_union = FALSE) |>
+        sf::st_cast("POLYGON") |>
+        dplyr::ungroup() |>
+        sf::st_buffer(0.0) |>
+        sf::st_cast("MULTIPOLYGON") |>
+        sf::st_cast("POLYGON", warn = FALSE) |>
+        st_buffer(0.0) |>
+        sf::st_make_valid() |>
         dplyr::mutate(
           id = dplyr::row_number()
-        ) %>%
-        sf::st_cast("POINT", warn = FALSE) %>%
+        ) |>
+        sf::st_cast("POINT", warn = FALSE) |>
         dplyr::mutate(
           x = sf::st_coordinates(.)[,1],
           y = sf::st_coordinates(.)[,2]
-        ) %>%
-        sf::st_drop_geometry() %>%
+        ) |>
+        sf::st_drop_geometry() |>
         dplyr::group_by(id) 
       if (dims$type == "horizontal") {
-        elevated_lines <- elevated_lines %>%
+        elevated_lines <- elevated_lines |>
           dplyr::mutate(
             z = y - min(y),
             y = y - z
           )
       } else {
-        elevated_lines <- elevated_lines %>%
+        elevated_lines <- elevated_lines |>
           dplyr::mutate(
             z = x - min(x),
             x = x - z
           )
       }
-      elevated_lines %>%
+      elevated_lines |>
         sf::st_as_sf(
           coords = c("x", "y", "z"),
           dim = "XYZ",
           crs = sf::st_crs(lines)
-        ) %>%
-        dplyr::group_by(id) %>%
-        dplyr::filter(n() >= 4) %>%
-        dplyr::summarize(do_union = FALSE) %>%
-        sf::st_cast("POLYGON") %>%
+        ) |>
+        dplyr::group_by(id) |>
+        dplyr::filter(n() >= 4) |>
+        dplyr::summarize(do_union = FALSE) |>
+        sf::st_cast("POLYGON") |>
         sf::st_cast("LINESTRING", warn = FALSE)
     } else {
       message("Returning polygons.")
-      elevated_lines %>%
+      elevated_lines |>
         sf::st_buffer(0.0)
     }
     
