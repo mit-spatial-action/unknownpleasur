@@ -1,0 +1,14 @@
+utils::citHeader("If you use this software, please cite it as follows:")
+
+utils::bibentry(
+  "Manual",
+  title = "urbanplanr: Access and Process Common Data Sources Used in Planning Practice",
+  author = person(
+      given = "Eric Robsky", family = "Huntley", 
+      email = "ehuntley@mit.edu", 
+      role = c("aut", "cph", "cre"),
+      comment = c(ORCID = "0000-0001-8497-0589")),
+  year = 2025,
+  doi = "10.5281/zenodo.15397868",
+  url = "https://github.com/mit-spatial-action/unknownpleasur" 
+)
