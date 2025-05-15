@@ -61,7 +61,7 @@ up_interpolate_vector <- function(x, field, nmax = 15, maxdist = Inf, idp = 2) {
     maxdist = maxdist,
     set = list(idp = idp)
   ) |>
-    gstat::predict(newdata = grid) |>
+    stats::predict(newdata = grid) |>
     dplyr::pull(.data$var1.pred)
   
   grid |>
@@ -165,7 +165,7 @@ up_offset_lines <- function(x, angle, col) {
     dplyr::summarize(
       geometry = sf::st_cast(sf::st_union(.data$geometry), "LINESTRING"),
       do_union = FALSE,
-      .by = id
+      .by = .data$id
     ) |>
     up_rotate_extent(angle) |>
     sf::st_set_crs(sf::st_crs(x))
