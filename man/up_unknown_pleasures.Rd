@@ -5,30 +5,36 @@
 \title{Transforms regularly-spaced lines into an "Unknown Pleasures"-esque set of regular section cuts based on raster value.}
 \usage{
 up_unknown_pleasures(
-  lines,
+  x,
   raster,
-  dims,
-  max = NULL,
-  sample_size = 250,
-  bleed_factor = 1.5,
+  interval,
+  line_angle,
+  scale,
+  factor,
+  elev_angle = line_angle,
   mode = "planar",
+  mask = TRUE,
   polygon = TRUE
 )
 }
 \arguments{
-\item{lines}{\code{sf} object containing regularly spaced lines.}
+\item{x}{\code{sf} object that will be treated as an extent..}
 
 \item{raster}{\code{raster} object.}
 
-\item{dims}{An object returned by the \code{up_get_dims()} function.}
+\item{interval}{Line and sample spacing. Can be \code{units} object. Otherwise will be in unit of CRS.}
 
-\item{max}{Numeric.}
+\item{line_angle}{Angle (in degrees) at which to create lines.}
 
-\item{sample_size}{Interval, in meters, to sample along lines.}
+\item{scale}{One of "actual" or "interval." If "actual", use actual raster values. If "interval," base scale on interval between lines.}
 
-\item{bleed_factor}{How much should maxima bleed into the area of the line above or below.}
+\item{factor}{Z exaggeration, essentially.}
+
+\item{elev_angle}{Angle at which to offset points.}
 
 \item{mode}{If \code{planar}, results will be planar offset lines. If \code{xyz}, lines will be offset on \code{LINESTRING} z axis.}
+
+\item{mask}{If \code{true}, output lines will be clipped to edge of input \code{x}.}
 
 \item{polygon}{If \code{TRUE}, outputs polygons (or closed linestrings if paired with \code{mode = "xyz"}. If \code{FALSE}, outputs lines with no baseline.}
 }

@@ -15,6 +15,12 @@ Imports:
     rlang,
     dplyr,
     terra,
+    glue,
     sf,
     tidyr,
+    gstat,
+    tibble
+Suggests:
     units
+Depends: 
+    R (>= 4.1)
