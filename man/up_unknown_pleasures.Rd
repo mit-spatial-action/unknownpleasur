@@ -5,28 +5,32 @@
 \title{Transforms regularly-spaced lines into an "Unknown Pleasures"-esque set of regular section cuts based on raster value.}
 \usage{
 up_unknown_pleasures(
-  lines,
+  x,
   raster,
-  dims,
   interval,
-  max = NULL,
-  bleed_factor = 1.5,
+  line_angle,
+  scale,
+  factor,
+  elev_angle = line_angle,
   mode = "planar",
+  mask = TRUE,
   polygon = TRUE
 )
 }
 \arguments{
-\item{lines}{\code{sf} object containing regularly spaced lines.}
+\item{x}{\code{sf} object that will be treated as an extent..}
 
 \item{raster}{\code{raster} object.}
 
-\item{dims}{An object returned by the \code{up_get_dims()} function.}
+\item{interval}{Line and sample spacing. Can be \code{units} object. Otherwise will be in unit of CRS.}
 
-\item{interval}{Interval. Can be \code{units} object. Otherwise will be in unit of CRS.}
+\item{line_angle}{Angle (in degrees) at which to create lines.}
 
-\item{max}{Numeric.}
+\item{scale}{One of "actual" or "interval." If "actual", use actual raster values. If "interval," base scale on interval between lines.}
 
-\item{bleed_factor}{How much should maxima bleed into the area of the line above or below.}
+\item{factor}{Z exaggeration, essentially.}
+
+\item{elev_angle}{Angle at which to offset points.}
 
 \item{mode}{If \code{planar}, results will be planar offset lines. If \code{xyz}, lines will be offset on \code{LINESTRING} z axis.}
 
