@@ -8,8 +8,8 @@ up_unknown_pleasures(
   lines,
   raster,
   dims,
+  interval,
   max = NULL,
-  sample_size = 250,
   bleed_factor = 1.5,
   mode = "planar",
   polygon = TRUE
@@ -22,9 +22,9 @@ up_unknown_pleasures(
 
 \item{dims}{An object returned by the \code{up_get_dims()} function.}
 
-\item{max}{Numeric.}
+\item{interval}{Interval. Can be \code{units} object. Otherwise will be in unit of CRS.}
 
-\item{sample_size}{Interval, in meters, to sample along lines.}
+\item{max}{Numeric.}
 
 \item{bleed_factor}{How much should maxima bleed into the area of the line above or below.}
 

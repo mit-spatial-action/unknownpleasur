@@ -2,20 +2,20 @@
 % Please edit documentation in R/unknownpleasur.R
 \name{up_regular_lines}
 \alias{up_regular_lines}
-\title{Generate \code{n} regularly-spaced lines over \code{df} extent.}
+\title{Generate regularly-spaced lines an an angle over an extent.}
 \usage{
-up_regular_lines(df, dims, mask = TRUE)
+up_regular_lines(x, cellsize, angle = 0)
 }
 \arguments{
-\item{df}{An \code{sf} dataframe.}
+\item{x}{An \code{sf} dataframe.}
 
-\item{dims}{Object returned by \code{up_get_dims()}.}
+\item{cellsize}{A spacing distance in linear units.}
 
-\item{mask}{Whether resulting lines should be clipped to df extent.}
+\item{angle}{Angle in degrees. 0 is horizontal.}
 }
 \value{
-A sf dataframe of regularly spaced POLYLINEs.
+\code{sf} object of regularly spaced \code{LINESTRING}s.
 }
 \description{
-Generate \code{n} regularly-spaced lines over \code{df} extent.
+Generate regularly-spaced lines an an angle over an extent.
 }

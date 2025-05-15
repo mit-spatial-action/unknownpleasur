@@ -31,67 +31,241 @@ up_get_dims <- function(df, n, type = "horizontal") {
     )
 }
 
-#' Generate `n` regularly-spaced lines over `df` extent.
+#' Interpolate polygons using inverse distance weighting
 #'
-#' @param df An `sf` dataframe.
-#' @param dims Object returned by `up_get_dims()`.
-#' @param mask Whether resulting lines should be clipped to df extent.
-#' @returns A sf dataframe of regularly spaced POLYLINEs.
+#' @param x An `sf` object containing POLYGONs.
+#' @param field Character. Name of field whose values should be interpolated.
+#' @param nmax Maximum number of adjacent observations.
+#' @param maxdist Maximum distance to be counted.
+#' @param idp Inverse distance power. Defaults to 2.
+#'
+#' @returns A `SpatRaster`.
+#' @export
+up_interpolate_vector <- function(x, field, nmax = 15, maxdist = Inf, idp = 2) {
+  pts <- x |>
+    sf::st_point_on_surface() |>
+    tidyr::drop_na(dplyr::all_of(field))
+  
+  raster <- tracts |>
+    terra::ext() |>
+    terra::rast(resolution = 250, crs = terra::crs(x))
+  
+  grid <- raster |>
+    terra::as.points() |> 
+    sf::st_as_sf()
+  
+  grid[[field]] <- gstat::gstat(
+    formula = as.formula(glue::glue("{field} ~ 1")),
+    data = pts,
+    nmax = nmax,
+    maxdist = maxdist,
+    set = list(idp = idp)
+  ) |>
+    predict(newdata = grid) |>
+    dplyr::pull(var1.pred)
+  
+  grid |>
+    terra::vect() |>
+    terra::rasterize(y = raster, field = field) |>
+    terra::mask(terra::vect(x))
+}
+
+#' Mask lines by shapes.
+#'
+#' @param x An `sf` object to mask.
+#' @param y An `sf` object to serve as mask/
+#'
+#' @returns An `sf` object.
+#' @export
+up_mask_lines <- function(x, y) {
+  x |>
+    sf::st_intersection(
+      y |> 
+        sf::st_union()
+    ) |>
+    dplyr::filter(sf::st_geometry_type(.data$geometry) != "POINT") |>
+    sf::st_cast("MULTILINESTRING") |>
+    sf::st_cast("LINESTRING", warn = FALSE) |>
+    dplyr::mutate(
+      id = dplyr::row_number()
+    )
+}
+
+#' Generate regularly-spaced lines an an angle over an extent.
+#'
+#' @param x An `sf` dataframe.
+#' @param cellsize A spacing distance in linear units.
+#' @param angle Angle in degrees. 0 is horizontal.
+#' @returns `sf` object of regularly spaced `LINESTRING`s.
 #' 
 #' @export
-up_regular_lines <- function(df, dims, mask = TRUE) {
+up_regular_lines <- function(x, 
+                             cellsize,
+                             angle = 0) {
   
-  bbox <- df |>
-    sf::st_bbox()
+  x |>
+    up_rotate_extent(-angle) |>
+    sf::st_make_grid(cellsize = cellsize, what="corners") |>
+    sf::st_coordinates() |>
+    tibble::as_tibble() |>
+    sf::st_as_sf(
+      coords=c("X", "Y"),
+      crs = sf::st_crs(x),
+      remove=FALSE
+    ) |>
+    dplyr::summarize(
+      geometry = sf::st_cast(sf::st_union(geometry), "LINESTRING"),
+      .by = Y
+    ) |>
+    dplyr::rename(
+      id = Y
+    ) |>
+    up_rotate_extent(angle)
+}
+
+#' Drape Geometries Using Column Value
+#'
+#' @param x An `sf` object.
+#' @param col Name of column containing offset values.
+#'
+#' @returns An `sf` object.
+#' @export
+up_drape_lines <- function(x, col) {
+  x |>
+    dplyr::rowwise() |>
+    dplyr::mutate(
+      geometry = list(sf::st_point(c(sf::st_coordinates(geometry)[1:2], .data[[col]])))
+    ) |>
+    dplyr::ungroup() |>
+    sf::st_as_sf() |>
+    dplyr::summarize(
+      geometry = sf::st_cast(sf::st_union(geometry), "LINESTRING"),
+      do_union = FALSE,
+      .by = id
+    ) |>
+    sf::st_set_crs(sf::st_crs(x))
+}
+
+#' Offset Points based on a Column Value and an Angle
+#'
+#' @param x An `sf` object containing points.
+#' @param angle Angle in degrees.
+#' @param col Name of column containing offset values.
+#'
+#' @returns `sf` object containing offset points.
+#' @export
+up_offset_lines <- function(x, angle, col) {
+  x |>
+    up_rotate_extent(-angle) |>
+    dplyr::rowwise() |>
+    dplyr::mutate(
+      geometry = .data$geometry + as.numeric(c(0, .data[[col]]))
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::summarize(
+      geometry = sf::st_cast(sf::st_union(geometry), "LINESTRING"),
+      do_union = FALSE,
+      .by = id
+    ) |>
+    up_rotate_extent(angle) |>
+    sf::st_set_crs(sf::st_crs(x))
+}
+
+#' Construct a Rotation Matrix.
+#'
+#' @param a Angle in radians.
+#'
+#' @returns A rotation matrix.
+up_rotate = function(a) {
+  matrix(c(cos(a), sin(a), -sin(a), cos(a)), 2, 2)
+}
+
+#' Rotate a Given `sf` Object by an Arbitrary Angle.
+#'
+#' @param x An `sf` object.
+#' @param angle Angle in degrees.
+#'
+#' @returns A rotated `sf` object.
+#' @export
+up_rotate_extent <- function(x, angle) {
+  angle <- angle * pi / 180
   
-  line_positions <- seq(
-      from = dims$int_min, 
-      to = dims$int_max, 
-      by = dims$interval
+  bbox <- sf::st_bbox(x)
+  center <- c(mean(bbox[c("xmin", "xmax")]), mean(bbox[c("ymin", "ymax")]))
+  
+  x |>
+    dplyr::mutate(
+      geometry = (sf::st_geometry(x) - center) * up_rotate(angle) + center
+    ) |>
+    sf::st_set_crs(sf::st_crs(x))
+}
+
+
+#' Sample Along Lines
+#'
+#' @param x An `sf` object containing lines.
+#' @param interval 
+#'
+#' @returns An `sf` object containing sampled points.
+#' @export
+up_sample_lines <- function(x, interval) {
+  x |>
+    dplyr::mutate(
+      geometry = sf::st_line_sample(geometry, density = 1 / interval)
+    ) |>
+    dplyr::filter(lengths(geometry) > 0) |>
+    sf::st_cast("POINT", warn = FALSE)
+}
+
+#' Elevate Lines Based on Raster Values
+#'
+#' @param x `sf` object containing `LINESTRING`s.
+#' @param interval Line spacing. Can be a `units` object.
+#' @param raster `terra` `Spatraster` from which to extract elevations.
+#' @param angle Angle of lines in degrees.
+#' @param scale 
+#' @param factor Z exaggeration.
+#' @param mode One of `"xyz"`, or `"planar"`. If `"xyz"` returns linestrings
+#' with Z component. If `"planar"` returns lines offset by value.
+#'
+#' @returns `sf` object containing `LINESTRING`s.
+#' @export
+up_elevate <- function(
+    x, 
+    interval, 
+    raster,
+    angle = 90, 
+    scale = "spacing",
+    factor = 1,
+    mode = "xyz") {
+  
+  x <- x |>
+    up_sample_lines(interval) |>
+    dplyr::mutate(
+      z = terra::extract(raster, sf::st_as_sf(.data$geometry))[,2]
     )
   
-  lines <- sf::st_sfc(crs = sf::st_crs(df))
-  for (line in line_positions) {
-    if (dims$type == "vertical") {
-      coords <- c(line, dims$edge_max, line, dims$edge_min)
-    } else if (dims$type == "horizontal") {
-      coords <- c(dims$edge_min, line, dims$edge_max, line)
-    } else {
-      stop("Invalid line type - expects horizontal or vertical.")
-    }
-      
-    line_const <- sf::st_sfc(
-      sf::st_linestring(
-        matrix(
-          coords, 
-          ncol = 2, 
-          byrow = TRUE
-          )
-      ),
-      crs = sf::st_crs(df)
-    )
-    lines <- sf::st_sfc(
-        c(lines, line_const),
-        crs = sf::st_crs(df)
-    )
+  if (scale == "interval") {
+    scaler <- (interval / max(abs(x$z), na.rm = TRUE))
+  } else if (scale == "actual") {
+    scaler <- 1
   }
-  sf <- sf::st_as_sf(data.frame(id = 1:dims$n, geometry = lines)) 
-  if (mask) {
-    sf |>
-      sf::st_intersection(
-        sf::st_geometry(df |> sf::st_union())
-      ) |>
-      dplyr::rowwise() |>
-      dplyr::filter(sf::st_geometry_type(.data$geometry) != "POINT") |>
-      dplyr::ungroup() |> 
-      sf::st_cast("MULTILINESTRING") |>
-      sf::st_cast("LINESTRING", warn = FALSE) |>
-      dplyr::mutate(
-        id = dplyr::row_number()
-      )
-  } else {
-    sf
+  
+  x <- x |>
+    tidyr::drop_na(z) |>
+    dplyr::mutate(
+      z = .data$z * scaler * factor
+    )
+  
+  if (mode == "xyz") {
+    x <- x |>
+      up_drape_lines(col = "z")
   }
+  else if (mode == "planar") {
+    x <- x |>
+      up_offset_lines(angle = angle, col = "z")
+  }
+  x
 }
 
 #' Transforms regularly-spaced lines into an "Unknown Pleasures"-esque set of regular section cuts based on raster value.
@@ -100,7 +274,7 @@ up_regular_lines <- function(df, dims, mask = TRUE) {
 #' @param raster `raster` object.
 #' @param dims An object returned by the `up_get_dims()` function.
 #' @param max Numeric.
-#' @param sample_size Interval, in meters, to sample along lines.
+#' @param interval Interval. Can be `units` object. Otherwise will be in unit of CRS.
 #' @param bleed_factor How much should maxima bleed into the area of the line above or below.
 #' @param mode If `planar`, results will be planar offset lines. If `xyz`, lines will be offset on `LINESTRING` z axis.
 #' @param polygon If `TRUE`, outputs polygons (or closed linestrings if paired with `mode = "xyz"`. If `FALSE`, outputs lines with no baseline.
@@ -112,68 +286,63 @@ up_unknown_pleasures <- function(
     lines, 
     raster, 
     dims,
+    interval,
     max = NULL,
-    sample_size = 250,
     bleed_factor = 1.5,
     mode = "planar",
     polygon = TRUE) {
-  elevated_lines <- lines |>
-    dplyr::mutate(
-      geometry = sf::st_line_sample(
-        .data$geometry, 
-        density = (1 / units::as_units(sample_size, "m")),
-        type = "regular"
-      )
-    ) |>
-    sf::st_cast("POINT", warn = FALSE)
+  
+  line_points <- up_sample_lines(lines, interval)
     
   message("Extracting elevations at sample points...")
-  elevated_lines$elev <- terra::extract(raster, elevated_lines)
-  elevated_lines
+  line_points$elev <- terra::extract(raster, line_points)
+  
   if (is.null(max)) {
-    max <- max(abs(elevated_lines$elev), na.rm = TRUE)
+    max <- max(abs(line_points$elev), na.rm = TRUE)
   }
-  scale <- dims$interval / max
-  elevated_lines <- elevated_lines |>
+  
+  line_points <- line_points  |>
     tidyr::drop_na(.data$elev) |>
+    # Filter out lines with only one point.
     dplyr::group_by(.data$id) |>
     dplyr::filter(dplyr::n() > 1) |>
     dplyr::ungroup() |>
+    # Scale elvation.
     dplyr::mutate(
-      elev_scaled = (.data$elev + (0.01 * .data$elev)) * (scale * bleed_factor)
+      elev_scaled = (.data$elev + (0.01 * .data$elev)) * (dims$interval / max * bleed_factor)
     ) |>
     tidyr::drop_na(.data$elev_scaled)
   if (mode == "planar") {
     message("Performing Affine Transform on points...")
-    elevated_lines <- elevated_lines |>
+    line_points <- line_points |>
       dplyr::rowwise() |>
       dplyr::mutate(
-        geometry = ifelse(
-          (dims$type == "horizontal"),
-          .data$geometry + c(0, .data$elev_scaled),
-          .data$geometry + c(.data$elev_scaled, 0)
-          ),
-        coords = ifelse(
-          (dims$type == "horizontal"),
-          sf::st_coordinates(.data$geometry)[,1],
-          sf::st_coordinates(.data$geometry)[,2]
+        geometry = dplyr::case_when(
+          dims$type == "horizontal" ~ .data$geometry + c(0, .data$elev_scaled),
+          dims$type == "vertical" ~ .data$geometry + c(.data$elev_scaled, 0),
+          .default = stop("Invalid type.")
+        ),
+        coords = dplyr::case_when(
+          dims$type == "horizontal" ~ sf::st_coordinates(.data$geometry)[,1],
+          dims$type == "vertical" ~ sf::st_coordinates(.data$geometry)[,2],
+          .default = stop("Invalid type.")
         )
       ) |>
       dplyr::ungroup() |>
       sf::st_set_crs(sf::st_crs(lines)) |>
       dplyr::group_by(.data$id)
       if (dims$type == "vertical") {
-        elevated_lines <- elevated_lines |>
+        line_points <- line_points|>
           dplyr::arrange(.data$coords, .by_group = TRUE) |>
           dplyr::ungroup()
       } else if (dims$type == "horizontal") {
-        elevated_lines <- elevated_lines |>
+        line_points <- line_points |>
           dplyr::arrange(dplyr::desc(.data$coords), .by_group = TRUE) |>
           dplyr::ungroup()
       }
   } else if (mode == "xyz") {
     message("Attaching Z values to component points...")
-    elevated_lines <- elevated_lines |>
+    line_points <- line_points |>
       dplyr::mutate(
         x = sf::st_coordinates(.data$geometry)[,1],
         y = sf::st_coordinates(.data$geometry)[,2]
@@ -185,7 +354,7 @@ up_unknown_pleasures <- function(
         crs = sf::st_crs(lines)
       )
   }
-  elevated_lines <- elevated_lines |>
+  line_points <- line_points |>
     dplyr::group_by(.data$id) |>
     dplyr::summarize(do_union = FALSE) |>
     sf::st_cast("LINESTRING")
@@ -194,7 +363,7 @@ up_unknown_pleasures <- function(
     message("Building closed loops...")
     lines <- lines |>
       dplyr::filter(
-        .data$id %in% dplyr::pull(elevated_lines, .data$id)
+        .data$id %in% dplyr::pull(line_points, .data$id)
       )
     if (mode == "xyz") {
       lines <- lines |>
@@ -204,7 +373,7 @@ up_unknown_pleasures <- function(
         ) |>
         sf::st_reverse()
     }
-    elevated_lines <- elevated_lines |>
+    line_points <- line_points |>
       dplyr::bind_rows(lines) |>
       sf::st_cast("POINT", warn = FALSE) |>
       dplyr::group_by(.data$id) |>
@@ -214,7 +383,7 @@ up_unknown_pleasures <- function(
       dplyr::arrange(dplyr::desc(.data$id))
     if (mode == "xyz") {
       warning("Can't build polygons in XYZ mode---returning POLYLINES instead.")
-      elevated_lines <- elevated_lines |>
+      line_points <- line_points |>
         sf::st_cast("POINT", warn = FALSE) |>
         dplyr::mutate(
           z = sf::st_coordinates(.data$geometry)[,3]
@@ -249,19 +418,19 @@ up_unknown_pleasures <- function(
         sf::st_drop_geometry() |>
         dplyr::group_by(.data$id) 
       if (dims$type == "horizontal") {
-        elevated_lines <- elevated_lines |>
+        line_points <- line_points |>
           dplyr::mutate(
             z = .data$y - min(.data$y),
             y = .data$y - .data$z
           )
       } else {
-        elevated_lines <- elevated_lines |>
+        line_points <- line_points |>
           dplyr::mutate(
             z = .data$x - min(.data$x),
             x = .data$x - .data$z
           )
       }
-      elevated_lines |>
+      line_points <- line_points |>
         sf::st_as_sf(
           coords = c("x", "y", "z"),
           dim = "XYZ",
@@ -274,11 +443,11 @@ up_unknown_pleasures <- function(
         sf::st_cast("LINESTRING", warn = FALSE)
     } else {
       message("Returning polygons.")
-      elevated_lines |>
+      line_points <- line_points |>
         sf::st_buffer(0.0)
     }
     
   } else {
-    elevated_lines
+    line_points
   }
 }
