@@ -9,7 +9,7 @@ up_sample_lines(x, interval)
 \arguments{
 \item{x}{An \code{sf} object containing lines.}
 
-\item{interval}{}
+\item{interval}{Linear units. Interval at which to sample lines.}
 }
 \value{
 An \code{sf} object containing sampled points.

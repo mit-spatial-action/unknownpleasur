@@ -34,6 +34,8 @@ up_unknown_pleasures(
 
 \item{mode}{If \code{planar}, results will be planar offset lines. If \code{xyz}, lines will be offset on \code{LINESTRING} z axis.}
 
+\item{mask}{If \code{true}, output lines will be clipped to edge of input \code{x}.}
+
 \item{polygon}{If \code{TRUE}, outputs polygons (or closed linestrings if paired with \code{mode = "xyz"}. If \code{FALSE}, outputs lines with no baseline.}
 }
 \value{

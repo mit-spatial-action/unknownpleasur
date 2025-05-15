@@ -46,7 +46,7 @@ up_interpolate_vector <- function(x, field, nmax = 15, maxdist = Inf, idp = 2) {
     sf::st_point_on_surface() |>
     tidyr::drop_na(dplyr::all_of(field))
   
-  raster <- tracts |>
+  raster <- x |>
     terra::ext() |>
     terra::rast(resolution = 250, crs = terra::crs(x))
   
@@ -55,14 +55,14 @@ up_interpolate_vector <- function(x, field, nmax = 15, maxdist = Inf, idp = 2) {
     sf::st_as_sf()
   
   grid[[field]] <- gstat::gstat(
-    formula = as.formula(glue::glue("{field} ~ 1")),
+    formula = stats::as.formula(glue::glue("{field} ~ 1")),
     data = pts,
     nmax = nmax,
     maxdist = maxdist,
     set = list(idp = idp)
   ) |>
-    predict(newdata = grid) |>
-    dplyr::pull(var1.pred)
+    gstat::predict(newdata = grid) |>
+    dplyr::pull(.data$var1.pred)
   
   grid |>
     terra::vect() |>
@@ -113,12 +113,12 @@ up_regular_lines <- function(x,
       crs = sf::st_crs(x),
       remove=FALSE
     ) |>
-    dplyr::summarize(
-      geometry = sf::st_cast(sf::st_union(geometry), "LINESTRING"),
-      .by = Y
-    ) |>
     dplyr::rename(
-      id = Y
+      id = "Y"
+    ) |>
+    dplyr::summarize(
+      geometry = sf::st_cast(sf::st_union(.data$geometry), "LINESTRING"),
+      .by = .data$id
     ) |>
     up_rotate_extent(angle)
 }
@@ -134,14 +134,14 @@ up_drape_lines <- function(x, col) {
   x |>
     dplyr::rowwise() |>
     dplyr::mutate(
-      geometry = list(sf::st_point(c(sf::st_coordinates(geometry)[1:2], .data[[col]])))
+      geometry = list(sf::st_point(c(sf::st_coordinates(.data$geometry)[1:2], .data[[col]])))
     ) |>
     dplyr::ungroup() |>
     sf::st_as_sf() |>
     dplyr::summarize(
-      geometry = sf::st_cast(sf::st_union(geometry), "LINESTRING"),
+      geometry = sf::st_cast(sf::st_union(.data$geometry), "LINESTRING"),
       do_union = FALSE,
-      .by = id
+      .by = .data$id
     ) |>
     sf::st_set_crs(sf::st_crs(x))
 }
@@ -163,7 +163,7 @@ up_offset_lines <- function(x, angle, col) {
     ) |>
     dplyr::ungroup() |>
     dplyr::summarize(
-      geometry = sf::st_cast(sf::st_union(geometry), "LINESTRING"),
+      geometry = sf::st_cast(sf::st_union(.data$geometry), "LINESTRING"),
       do_union = FALSE,
       .by = id
     ) |>
@@ -204,16 +204,16 @@ up_rotate_extent <- function(x, angle) {
 #' Sample Along Lines
 #'
 #' @param x An `sf` object containing lines.
-#' @param interval 
+#' @param interval Linear units. Interval at which to sample lines.
 #'
 #' @returns An `sf` object containing sampled points.
 #' @export
 up_sample_lines <- function(x, interval) {
   x |>
     dplyr::mutate(
-      geometry = sf::st_line_sample(geometry, density = 1 / interval)
+      geometry = sf::st_line_sample(.data$geometry, density = 1 / interval)
     ) |>
-    dplyr::filter(lengths(geometry) > 0) |>
+    dplyr::filter(lengths(.data$geometry) > 0) |>
     sf::st_cast("POINT", warn = FALSE)
 }
 
@@ -223,7 +223,7 @@ up_sample_lines <- function(x, interval) {
 #' @param interval Line spacing. Can be a `units` object.
 #' @param raster `terra` `Spatraster` from which to extract elevations.
 #' @param angle Angle of lines in degrees.
-#' @param scale 
+#' @param scale One of "actual" or "interval." If "actual", use actual raster values. If "interval," base scale on interval between lines.
 #' @param factor Z exaggeration.
 #' @param mode One of `"xyz"`, or `"planar"`. If `"xyz"` returns linestrings
 #' with Z component. If `"planar"` returns lines offset by value.
@@ -235,7 +235,7 @@ up_elevate <- function(
     interval, 
     raster,
     angle = 90, 
-    scale = "spacing",
+    scale = "interval",
     factor = 1,
     mode = "xyz") {
   
@@ -252,7 +252,7 @@ up_elevate <- function(
   }
   
   x <- x |>
-    tidyr::drop_na(z) |>
+    tidyr::drop_na("z") |>
     dplyr::mutate(
       z = .data$z * scaler * factor
     )
@@ -285,7 +285,7 @@ up_polygonize <- function(x, baselines, id_col, mode = "planar") {
     baselines <- baselines |>
       dplyr::rowwise() |>
       dplyr::mutate(
-        geometry = list(sf::st_point(c(sf::st_coordinates(geometry)[1:2], 0)))
+        geometry = list(sf::st_point(c(sf::st_coordinates(.data$geometry)[1:2], 0)))
       ) |>
       dplyr::ungroup() |>
       sf::st_set_crs(sf::st_crs(baselines))
@@ -325,6 +325,7 @@ up_polygonize <- function(x, baselines, id_col, mode = "planar") {
 #' @param scale One of "actual" or "interval." If "actual", use actual raster values. If "interval," base scale on interval between lines.
 #' @param factor Z exaggeration, essentially.
 #' @param mode If `planar`, results will be planar offset lines. If `xyz`, lines will be offset on `LINESTRING` z axis.
+#' @param mask If `true`, output lines will be clipped to edge of input `x`.
 #' @param polygon If `TRUE`, outputs polygons (or closed linestrings if paired with `mode = "xyz"`. If `FALSE`, outputs lines with no baseline.
 #' 
 #' @returns `sf` object  containing "Unknown Pleasures" features.
@@ -353,7 +354,7 @@ up_unknown_pleasures <- function(
   elev <- lines |>
     up_elevate(
       interval, 
-      raster = dem, 
+      raster = raster, 
       angle = elev_angle, 
       scale = scale, 
       factor = factor, 

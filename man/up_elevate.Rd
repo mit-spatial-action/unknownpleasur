@@ -9,7 +9,7 @@ up_elevate(
   interval,
   raster,
   angle = 90,
-  scale = "spacing",
+  scale = "interval",
   factor = 1,
   mode = "xyz"
 )
@@ -23,7 +23,7 @@ up_elevate(
 
 \item{angle}{Angle of lines in degrees.}
 
-\item{scale}{}
+\item{scale}{One of "actual" or "interval." If "actual", use actual raster values. If "interval," base scale on interval between lines.}
 
 \item{factor}{Z exaggeration.}
 
