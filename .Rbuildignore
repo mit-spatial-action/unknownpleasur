@@ -12,3 +12,5 @@
 ^\.github$
 ^media$
 ^sandbox$
+^CRAN-SUBMISSION$
+^README\.md$
