@@ -1,36 +1,3 @@
-#' Generate list of dimension-related quantities.
-#'
-#' @param df `sf` object.
-#' @param n Number of regularly-spaced lines to generate.
-#' @param type String indicating direction of lines---options are "horizontal" and "vertical".
-#' @returns A list of interval-relevant values.
-#' 
-#' @export
-up_get_dims <- function(df, n, type = "horizontal") {
-  if (type == "horizontal") {
-    axes <- list("int_dim" = "y", "edge_dim" = "x")
-  } else if (type == "vertical") {
-    axes <- list("int_dim" = "x", "edge_dim" = "y")
-  } else {
-    stop("Invalid line type - expects horizontal or vertical.")
-  }
-  bbox <- sf::st_bbox(df)
-  int_min <- unname(bbox[paste0(axes$int_dim, "min")])
-  int_max <- unname(bbox[paste0(axes$int_dim, "max")])
-  edge_min <- unname(bbox[paste0(axes$edge_dim, "min")])
-  edge_max <- unname(bbox[paste0(axes$edge_dim, "max")])
-  list(
-    "axes" = axes,
-    "int_min" = int_min, 
-    "int_max" = int_max, 
-    "edge_min" = edge_min, 
-    "edge_max" = edge_max, 
-    "interval" = (int_max - int_min) / (n - 1),
-    "n" = n,
-    "type" = type
-    )
-}
-
 #' Interpolate polygons using inverse distance weighting
 #'
 #' @param x An `sf` object containing POLYGONs.
@@ -254,7 +221,7 @@ up_elevate <- function(
   x <- x |>
     tidyr::drop_na("z") |>
     dplyr::mutate(
-      z = .data$z * scaler * factor
+      z = .data$z * scaler * factor - min(abs(.data$z), na.rm = TRUE)
     )
   
   if (mode == "xyz") {

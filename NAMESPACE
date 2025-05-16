@@ -2,7 +2,6 @@
 
 export(up_drape_lines)
 export(up_elevate)
-export(up_get_dims)
 export(up_interpolate_vector)
 export(up_mask_lines)
 export(up_offset_lines)
