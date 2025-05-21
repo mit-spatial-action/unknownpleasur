@@ -2,12 +2,21 @@ utils::citHeader("If you use this software, please cite it as follows:")
 
 utils::bibentry(
   "Manual",
-  title = "urbanplanr: Access and Process Common Data Sources Used in Planning Practice",
-  author = person(
+  title = "unknownpleasur: Produce Regularly-Spaced Ridgelines at Arbitrary Angles",
+  author = c(
+    utils::person(
       given = "Eric Robsky", family = "Huntley", 
       email = "ehuntley@mit.edu", 
       role = c("aut", "cph", "cre"),
-      comment = c(ORCID = "0000-0001-8497-0589")),
+      comment = c(ORCID = "0000-0001-8497-0589")
+    ),
+    utils::person(
+      given = "Asya", family = "Aizman", 
+      email = "aizman@mit.edu", 
+      role = c("ctb"),
+      comment = c(ORCID = "0000-0002-7528-8585")
+    ),
+  ),
   year = 2025,
   doi = "10.5281/zenodo.15397868",
   url = "https://github.com/mit-spatial-action/unknownpleasur" 
