@@ -4,8 +4,7 @@ Version: 0.1.0
 Authors@R: c(person("Eric", "Robsky Huntley", email = "ehuntley@mit.edu", 
                 role = c("aut", "cph", "cre"), comment = c(ORCID = "0000-0001-8497-0589")),
              person("Asya", "Aizman", email = "aizman@mit.edu", role = c("ctb"),
-                comment = c(ORCID = "0000-0002-7528-8585"))),
-)
+                comment = c(ORCID = "0000-0002-7528-8585")))
 Description: A set of function for producing ridgelines at arbitrary angles from 'terra'
             objects. While ridgeline plots are well-supported in the 'ggplot' ecosystem,
             particularly by the 'ggridges' package, the functions provided here differ in
