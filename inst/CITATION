@@ -15,7 +15,7 @@ utils::bibentry(
       email = "aizman@mit.edu", 
       role = c("ctb"),
       comment = c(ORCID = "0000-0002-7528-8585")
-    ),
+    )
   ),
   year = 2025,
   doi = "10.5281/zenodo.15397868",

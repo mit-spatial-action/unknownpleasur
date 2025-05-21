@@ -1,33 +1,36 @@
 Package: unknownpleasur
 Title: Produce Regularly-Spaced Ridgelines at Arbitrary Angles
 Version: 0.1.0
-Authors@R: c(person("Eric", "Robsky Huntley", email = "ehuntley@mit.edu", 
-                role = c("aut", "cph", "cre"), comment = c(ORCID = "0000-0001-8497-0589")),
-             person("Asya", "Aizman", email = "aizman@mit.edu", role = c("ctb"),
-                comment = c(ORCID = "0000-0002-7528-8585")))
-Description: A set of function for producing ridgelines at arbitrary angles from 'terra'
-            objects. While ridgeline plots are well-supported in the 'ggplot' ecosystem,
-            particularly by the 'ggridges' package, the functions provided here differ in
-            that lines (or enclosed polygons) are returned as 'sf' objects that are either 
-            offset using an affine transform or returned with a Z component. This support 
-            export to and visualization with a geographic information system or interactive 
-            mapping tool.
+Authors@R: c(
+    person("Eric", "Robsky Huntley", , "ehuntley@mit.edu", role = c("aut", "cph", "cre"),
+           comment = c(ORCID = "0000-0001-8497-0589")),
+    person("Asya", "Aizman", , "aizman@mit.edu", role = "ctb",
+           comment = c(ORCID = "0000-0002-7528-8585"))
+  )
+Description: A set of function for producing ridgelines at arbitrary
+    angles from 'terra' objects. While ridgeline plots are well-supported
+    in the 'ggplot' ecosystem, particularly by the 'ggridges' package, the
+    functions provided here differ in that lines (or enclosed polygons)
+    are returned as 'sf' objects that are either offset using an affine
+    transform or returned with a Z component. This support export to and
+    visualization with a geographic information system or interactive
+    mapping tool.
 License: GPL-3 + file LICENSE
 URL: https://github.com/mit-spatial-action/unknownpleasur
 BugReports: https://github.com/mit-spatial-action/unknownpleasur/issues
+Depends: 
+    R (>= 4.1)
+Imports: 
+    dplyr,
+    glue,
+    gstat,
+    rlang,
+    sf,
+    terra,
+    tibble,
+    tidyr
+Suggests:
+    units
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
-Imports: 
-    rlang,
-    dplyr,
-    terra,
-    glue,
-    sf,
-    tidyr,
-    gstat,
-    tibble
-Suggests:
-    units
-Depends: 
-    R (>= 4.1)
